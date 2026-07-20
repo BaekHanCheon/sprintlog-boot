@@ -51,7 +51,7 @@ public class GlobalExceptionHandler {
             "요청 본문의 일부 필드가 유효하지 않습니다.", "입력 오류" );
         pd.setProperty("errors", errors);
         return pd;
-    }
+    }//
 
     // 400 — JSON 자체가 깨졌거나 enum 에 없는 값 등, 요청 본문을 읽지 못함
     @ExceptionHandler(HttpMessageNotReadableException.class)
