@@ -7,6 +7,7 @@ import com.sprintlog.sprintlogboot.domain.Visibility;
 import com.sprintlog.sprintlogboot.dto.request.CreateActivityRequest;
 import com.sprintlog.sprintlogboot.dto.request.UpdateActivityRequest;
 import com.sprintlog.sprintlogboot.dto.response.ActivityResponse;
+import com.sprintlog.sprintlogboot.exception.ActivityArchiveException;
 import com.sprintlog.sprintlogboot.exception.ActivityNotFoundException;
 import com.sprintlog.sprintlogboot.repository.ActivityRepository;
 import com.sprintlog.sprintlogboot.repository.AuditLogRepository;
@@ -18,22 +19,23 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.util.List;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
+@Transactional(readOnly = true) // 클래스 레벨에 @Transactional을 설정하면 모든 메서드가 readonly 트랜잭션을 가지게 됩니다.
 public class ActivityService {
 
     private final ActivityRepository repository;
     private final AuditLogRepository auditLogRepository;
     private final AuditService auditService;
 
-
     public List<ActivityResponse> search(ActivityCategory category, String keyword, Integer minMinutes) {
 
         if (category != null) {
-           return convertToDtoList(repository.findByCategory(category));
+            return convertToDtoList(repository.findByCategory(category));
         }
         if (keyword != null && !keyword.isBlank()) {
             return convertToDtoList(repository.findByTitleContainingIgnoreCase(keyword));
@@ -48,10 +50,9 @@ public class ActivityService {
 
     private List<ActivityResponse> convertToDtoList(List<LearningActivity> list) {
         return list.stream()
-                .map(a -> ActivityResponse.from(a))
-                .toList();
+            .map(a -> ActivityResponse.from(a))
+            .toList();
     }
-
 
     public Page<LearningActivity> page(String sort, int page, int size, Long ownerId) {
         // 기존에는 정렬 기준을 Comparator로 지정했는데, JPA에서 제공하는 페이징 기능을 사용하기 위해
@@ -66,22 +67,24 @@ public class ActivityService {
         Pageable pageable = PageRequest.of(page - 1, size, sortBy);
 
         return (ownerId != null)
-                ? repository.findByOwnerId(ownerId, pageable)
-                : repository.findAll(pageable);
+            ? repository.findByOwnerId(ownerId, pageable)
+            : repository.findAll(pageable);
 
 
     }
 
     public LearningActivity get(Long id) {
         return repository.findById(id)
-                .orElseThrow(() -> new ActivityNotFoundException(id));
+            .orElseThrow(() -> new ActivityNotFoundException(id));
     }
 
-
+    @Transactional
     public LearningActivity create(CreateActivityRequest request, String savedFileName) {
         LearningActivity activity = toActivity(request);
         activity.attachFile(savedFileName);
-        return repository.save(activity);
+        LearningActivity saved = repository.save(activity);
+        log.info("활동 생성 완료 id={}, category={}, title={}", saved.getId(), saved.getCategory(), saved.getTitle());
+        return saved;
     }
 
 
@@ -89,8 +92,8 @@ public class ActivityService {
     // 종류(type)와 종류별 필드를 그대로 단일 생성자에 넘기면 된다(엔티티가 category 로 구분).
     private LearningActivity toActivity(CreateActivityRequest request) {
         LearningActivity activity = new LearningActivity(
-                request.type(), request.title(), request.minutes(), request.visibility(),
-                request.instructorName(), request.completionRate(), request.bookTitle());
+            request.type(), request.title(), request.minutes(), request.visibility(),
+            request.instructorName(), request.completionRate(), request.bookTitle());
 
         if (request.tags() != null) {
             request.tags().forEach(activity::addTag);
@@ -98,10 +101,10 @@ public class ActivityService {
         return activity;
     }
 
-    @Transactional
+    @Transactional // 메서드 레벨에 트랜잭션을 걸면 클래스 레벨보다 더 우선시됩니다.
     public LearningActivity update(Long id, @Valid UpdateActivityRequest request) {
         LearningActivity activity = repository.findById(id)
-                .orElseThrow(() -> new ActivityNotFoundException(id));
+            .orElseThrow(() -> new ActivityNotFoundException(id));
 
         activity.changeTitle(request.title());
         if (request.visibility() == Visibility.PUBLIC) {
@@ -111,7 +114,9 @@ public class ActivityService {
         }
         // JPA가 적용된 상태에서의 update는 findById로 조회해 온 Entity를 setter로 변경
         // 변경 후 명시적으로 save()를 호출하면 영속성 컨텍스트의 변경 감지(dirty checking)에 의해 update 쿼리가 날아감
-        return repository.save(activity);
+        LearningActivity saved = repository.save(activity);
+        log.info("활동 수정 완료 id={}", saved.getId());
+        return saved;
     }
 
     @Transactional
@@ -121,6 +126,7 @@ public class ActivityService {
             throw new ActivityNotFoundException(id);
         }
         repository.deleteById(id);
+        log.info("활동 삭제 완료 id={}", id);
     }
 
     public Slice<LearningActivity> sliceByVisibility(Visibility visibility, int page, int size) {
@@ -140,9 +146,9 @@ public class ActivityService {
     @Transactional
     public void demoAtomicRegister(boolean fail) {
         LearningActivity activity = repository.save(new LearningActivity(
-                ActivityCategory.LECTURE, "원자성 데모 학습",
-                30, Visibility.PUBLIC, "이강사",
-                null, null
+            ActivityCategory.LECTURE, "원자성 데모 학습",
+            30, Visibility.PUBLIC, "이강사",
+            null, null
         ));
 
         auditLogRepository.save(new ActivityAuditLog("CREATE", "활동 생성(원자성 데모)" + activity.getTitle()));
@@ -159,7 +165,7 @@ public class ActivityService {
 
         // ② 본 작업 — 부모 트랜잭션에서 활동 저장
         repository.save(new LearningActivity(
-                ActivityCategory.LECTURE, "전파 데모 학습", 30, Visibility.PUBLIC, "이강사", null, null));
+            ActivityCategory.LECTURE, "전파 데모 학습", 30, Visibility.PUBLIC, "이강사", null, null));
 
         // ③ 실패하면 부모만 롤백 — 위 시도 이력(①)은 이미 커밋되어 살아남는다.
         if (fail) {
@@ -167,20 +173,14 @@ public class ActivityService {
         }
     }
 
+    @Transactional(rollbackFor = {ActivityArchiveException.class, IOException.class})
+    public void archive(boolean fail) throws ActivityArchiveException {
+        repository.save(new LearningActivity(
+            ActivityCategory.READING, "보관 시연 활동(rollbackFor 없음)", 20, Visibility.PUBLIC, null, null, "보관용 책"));
 
-
+        if (fail) {
+            // 체크 예외 — 기본 롤백 대상이 아니다 → 위 저장은 커밋되어 남는다.
+            throw new ActivityArchiveException("보관 실패(체크 예외) — 하지만 기본 롤백은 안 된다");
+        }
+    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
