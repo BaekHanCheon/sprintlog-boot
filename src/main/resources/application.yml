@@ -17,6 +17,18 @@ spring:
 server:
   port: 8080
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics # 꼭 필요한 정보만 노출
+      base-path: /management #경로도 바꿔서 숨김
+  endpoint:
+    health:
+      show-details: always #개발 환경에선 always, 운영에서는 when_authorized
+  server:
+    port: 9090
+
 springdoc:
   swagger-ui:
     path: /api-docs-ui.html # UI page 경로
