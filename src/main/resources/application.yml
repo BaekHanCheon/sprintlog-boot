@@ -1,12 +1,29 @@
 # SprintLog Boot의 기본 설정 파일
 # Spring Boot가 초기화 될 때 항상 이 파일을 읽는다.
+info:
+  app:
+    name: SprintLog
+    description: 학습 기록 서비스
+    version: 1.0.0
+    encoding: UTF-8
+    java-version: 17
+
+  company:
+    name: MyCompany
+    email: support@mycompany.com
+    website: https://mycompany.com
+
+  team:
+    developer: Backend Team
+    manager: John Doe
+    contact: backend-team@mycompany.com
 
 spring:
   application:
     name: sprintlog-boot
 
   profiles:
-    active: prod
+    active: dev
 
   servlet:
     multipart:
@@ -26,6 +43,9 @@ management:
   endpoint:
     health:
       show-details: always #개발 환경에선 always, 운영에서는 when_authorized
+  info:
+    env:
+      show-details: always
   server:
     port: 9090
 
