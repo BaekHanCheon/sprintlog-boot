@@ -141,5 +141,8 @@ public class FileService {
             log.error("파일 삭제 실패: {}", fileName, e);
         }
     }
+
+  public void create(Object any) {
+  }
 }
 
