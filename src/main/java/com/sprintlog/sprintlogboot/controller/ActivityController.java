@@ -176,6 +176,16 @@ public class ActivityController implements ActivityControllerDocs {
         return ResponseEntity.ok().body(list);
     }
 
+    @GetMapping("/achievement")
+    public ResponseEntity<Map<String, Integer>> achievement(@RequestParam int goalMinutes) {
+        if (goalMinutes <= 0) {
+            throw new IllegalArgumentException("주간 목표 시간은 1분 이상이어야 합니다.");
+        }
+        int rate = dashboard.achievementRate(goalMinutes);
+        return ResponseEntity.ok().body(Map.of("goalMinutes", goalMinutes, "achievementRate", rate));
+    }
+
+
     // 트랜잭션 원자성 시연 - 활동 등록 (활동 저장 + 이력 기록)을 한 트랜잭션
     @PostMapping("/demo-atomic")
     public ResponseEntity<String> demoAtomic(@RequestParam(defaultValue = "false") boolean fail) {
