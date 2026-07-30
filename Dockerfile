@@ -1,5 +1,5 @@
 # ----- 1. build 스테이지 -----
-FROM eclipse-temurin:17-jdk-alpine AS build
+FROM eclipse-temurin:17-jdk AS build
 
 WORKDIR /workspace
 
@@ -14,11 +14,11 @@ RUN chmod +x gradlew && ./gradlew dependencies --no-daemon
 # 소스코드 복사 후 실행가능한 .jar 빌드
 # 개발 과정에서 테스트를 이미지 빌드에서 제외
 COPY src ./src
-RUN ./gradlew clean build -x test
+RUN ./gradlew bootJar -x test
 
 
 # ----- 2. run 스테이지 -----
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 WORKDIR /app
 
 # 네트워크 요청 도구인 curl 설치, 불필요한 패키지 설정을 막고 패키지 목록 임시 파일들을 전부다 삭제해서 이미지 용량을 줄이자.
@@ -31,7 +31,6 @@ COPY --from=build /workspace/build/libs/sprintlog-boot-0.0.1-SNAPSHOT.jar app.ja
 
 # 타임존 설정
 ENV TZ=Asia/Seoul
-RUN apk add --no-cache tzdata
 
 # 운영 프로파일로 실행하기 위해 환경변수 값을 prod로 전달
 ENV SPRING_PROFILES_ACTIVE=prod
