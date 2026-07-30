@@ -50,6 +50,10 @@ dependencies {
     // 쿼리 파라미터 추가 외부 로그 남기기 (콘솔에서 sql 자세히 보기)
     implementation 'com.github.gavlyukovskiy:p6spy-spring-boot-starter:1.9.0'
 
+    //AWS SDK for Java v2 (S3Client로 업로드/삭제, S3Presigner로 presigned URL)
+    implementation platform('software.amazon.awssdk:bom:2.46.7')
+    implementation 'software.amazon.awssdk:s3'
+
 
 }
 

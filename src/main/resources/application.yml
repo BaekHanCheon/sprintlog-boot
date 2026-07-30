@@ -66,3 +66,10 @@ sprintlog:
     enabled: true
     count: 4
   file-directory: /Users/stephen/Desktop/codeit-13th-develop/spring-upload
+
+  storage: local
+  s3:
+    bucket: sprintlog-uploads
+    region: ap-northeast-2
+    endpoint:
+    presign-minutes: 5

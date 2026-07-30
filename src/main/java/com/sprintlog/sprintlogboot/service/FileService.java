@@ -3,6 +3,7 @@ package com.sprintlog.sprintlogboot.service;
 import com.sprintlog.sprintlogboot.exception.FileStorageException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.UrlResource;
 import org.springframework.stereotype.Service;
@@ -19,7 +20,9 @@ import java.util.UUID;
 
 @Service
 @Slf4j
-public class FileService {
+@ConditionalOnProperty(name = "sprintlog.storge", havingValue = "local", matchIfMissing = true)
+
+public class FileService implements FileStorage {
 
     /**
      * 허용 확장자 화이트리스트. blacklist(금지 목록)는 우회가 끝없으므로,
@@ -82,6 +85,16 @@ public class FileService {
         } catch (IOException e) {
             throw new FileStorageException("파일 저장 실패: " + originalFilename, e);
         }
+    }
+
+    @Override
+    public String getFileUrl(String storedName) {
+        return "/api/files/" + storedName;
+    }
+
+    @Override
+    public String getDownloadUrl(String storedName) {
+        return "/api/files/" + storedName + "?download=1";
     }
 
     /**
