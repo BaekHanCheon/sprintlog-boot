@@ -18,12 +18,12 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Configuration
 @Slf4j
-@ConditionalOnProperty(name = "sprintlog.storge", havingValue = "s3")
-@EnableConfigurationProperties(S3properties.class)
+@ConditionalOnProperty(name = "sprintlog.storage", havingValue = "s3")
+@EnableConfigurationProperties(S3Properties.class)
 public class S3Config {
 
   @Bean
-  public S3Client s3Client(S3properties props){
+  public S3Client s3Client(S3Properties props){
     S3ClientBuilder builder = S3Client.builder().region(Region.of(props.getRegion()));
 
     if(StringUtils.hasText(props.getEndpoint())){
@@ -38,7 +38,7 @@ public class S3Config {
       // DefaultCredentialsProvider 자격증명을 정해진 순서대로 찾아보는 체인 객체
       //1. 환경변수로 전달된 값이 있는지 (AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY)
       //2. 자바 시스템 프로퍼티
-      //3. aws-cli를 통해 설정된 프로파일이 존재 하는지
+      //3. aws-cli를 통해 설정된 프로파일이 존재 하는지 <- 현재
       //4. ECS 태스크 역할 / EC2 인스턴스 프로파일
       builder.forcePathStyle(false).credentialsProvider(DefaultCredentialsProvider.builder().build());
       log.info("S3Client - 실제 AWS(region={})", props.getRegion());
@@ -49,7 +49,7 @@ public class S3Config {
 
 
   @Bean
-  public S3Presigner s3Presigner(S3properties props){
+  public S3Presigner s3Presigner(S3Properties props){
     S3Presigner.Builder builder = S3Presigner.builder().region(Region.of(props.getRegion()));
 
     if(StringUtils.hasText(props.getEndpoint())){

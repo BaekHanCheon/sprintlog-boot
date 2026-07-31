@@ -20,7 +20,7 @@ import java.util.UUID;
 
 @Service
 @Slf4j
-@ConditionalOnProperty(name = "sprintlog.storge", havingValue = "local", matchIfMissing = true)
+@ConditionalOnProperty(name = "sprintlog.storage", havingValue = "local", matchIfMissing = true)
 
 public class FileService implements FileStorage {
 

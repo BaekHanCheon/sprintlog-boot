@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @Getter
 @Setter
 @ConfigurationProperties("sprintlog.s3")
-public class S3properties {
+public class S3Properties {
   /** 버킷 이름. */
   private String bucket = "sprintlog-uploads";
 
