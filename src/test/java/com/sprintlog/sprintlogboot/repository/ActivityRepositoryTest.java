@@ -73,7 +73,7 @@ class ActivityRepositoryTest {
 
       // then
       assertThat(result).extracting(LearningActivity::getTitle)
-          .containsExactlyInAnyOrder("Spring boot 입문", "JPA 심화");
+          .containsExactlyInAnyOrder("Spring Boot 입문", "JPA 심화");
 
       assertThat(result).isNotEmpty().allMatch(activity -> activity.hasTag("spring"));
 
