@@ -40,7 +40,12 @@ public class DataInitializer {
         log.info("[lifecycle] @PostConstruct — DataInitializer 가 샘플 데이터를 적재합니다.");
 
         if (userRepository.count() == 0) {
-            User choon = new User("김춘식", "choon@naver.com", passwordEncoder.encode("password123"));
+
+            User admin = new User("관리자", "admin@sprintlog.com", passwordEncoder.encode("admin123"),
+                Role.ADMIN);
+            userRepository.save(admin);
+
+            User choon = new User("김춘식", "choon@naver.com", passwordEncoder.encode("password123"), Role.USER);
             LearningActivity l1 = new LearningActivity(
                     ActivityCategory.LECTURE, "Spring Bean Scope", 90, Visibility.PUBLIC, "이강사", null, null);
             LearningActivity l2 = new LearningActivity(
