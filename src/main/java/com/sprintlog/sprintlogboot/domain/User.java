@@ -19,6 +19,9 @@ public class User extends BaseEntity {
     @Column(nullable = false, unique = true, length = 100)
     private String email;
 
+    @Column(length = 100)
+    private String password;
+
     // 연관관계의 주인이 아는 User는 mappedBy 속성을 세팅해 줍니다.
     // "owner"값을 세팅한 건, 연관관계의 주인 쪽 필드가 User다 라는 것을 얘기해 주는 것.
     // 여기에 선언된 활동 리스트는 실제 DB에는 존재하지 않는 데이터입니다. 이건 JPA가 연관관계를 보고 만들어주는 가상의 컬럼입니다.
@@ -59,6 +62,12 @@ public class User extends BaseEntity {
     public User(String nickname, String email) {
         this.nickname = nickname;
         this.email = email;
+    }
+
+    public User(String nickname, String email, String password) {
+        this.nickname = nickname;
+        this.email = email;
+        this.password = password;
     }
 }
 
