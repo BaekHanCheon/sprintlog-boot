@@ -1,12 +1,16 @@
 package com.sprintlog.sprintlogboot.config;
 
+import com.sprintlog.sprintlogboot.filter.RequestIdFilter;
+import com.sprintlog.sprintlogboot.filter.RequestLoggingFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity // 생략가능 관례적 등록
@@ -26,7 +30,11 @@ public class SecurityConfig {
         //경로별 인증 및 궈한 체크 진행이 가능
         .authorizeHttpRequests(auth -> auth
             .anyRequest().permitAll()
-        );
+        )
+        .httpBasic(Customizer.withDefaults())
+        .addFilterBefore(new RequestIdFilter(), UsernamePasswordAuthenticationFilter.class)
+        .addFilterAfter(new RequestLoggingFilter(), RequestIdFilter.class);
+
     return http.build();
   }
 
