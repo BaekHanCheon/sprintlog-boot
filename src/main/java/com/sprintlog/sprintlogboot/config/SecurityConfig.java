@@ -61,10 +61,29 @@ public class SecurityConfig {
             .anyRequest().permitAll()
         )
         //필터단에서 발생한 커스텀 예외 처리 등록 로직
-        .exceptionHandling(ex -> ex
-            .authenticationEntryPoint(restAuthenticationEntryPoint)
-            .accessDeniedHandler(restAccessDeniedHandler))
+        .exceptionHandling(ex -> ex.authenticationEntryPoint(restAuthenticationEntryPoint).accessDeniedHandler(restAccessDeniedHandler))
+
+        //http basic인증을 켠다 (Authorization 헤더에 Basic <email:password(Base64)> 형식으로 전달되면 DaoAuthenticationProvider를 통해 로그인 검증을 수행하고 SecurityContext에 인증을 채운다.
+        //매 요청마다 자격증명을 실어 보내는 무상태 방식
         .httpBasic(Customizer.withDefaults())
+
+
+        // 폼 로그인 (세션 기반)을 준다.
+        // 한번 로그인하면 서버가 세션을 만들고 JSESSIONID 쿠키를 발급
+        // 이후 요청은 그 쿠키만으로 인증 유지된다 - 상태 유지 (stateful) 방식
+        .formLogin(form ->
+            form.loginPage("/login.html") // 우리가 만들 로그인 페이지
+                .loginProcessingUrl("/login") //폼이 POST 처리되는 URL(Spring이 가로챔)
+                .defaultSuccessUrl("/api/v1/auth/whoami", true) //로그인 성공하면 이쪽 url로 이동
+                .permitAll() // 로그인 요청은 누구나 접근 가능함
+        )
+        .logout(logout ->
+            logout.logoutUrl("/logout").logoutSuccessUrl("/login.html")
+                .logoutSuccessUrl("/login.html?logout")
+                .invalidateHttpSession(true)
+                .deleteCookies("JSESSIONID")
+        )
+
         .addFilterBefore(new RequestIdFilter(), UsernamePasswordAuthenticationFilter.class)
         .addFilterAfter(new RequestLoggingFilter(), RequestIdFilter.class);
 
