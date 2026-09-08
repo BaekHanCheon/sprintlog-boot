@@ -1,21 +1,36 @@
 package com.sprintlog.sprintlogboot.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sprintlog.sprintlogboot.filter.RequestIdFilter;
 import com.sprintlog.sprintlogboot.filter.RequestLoggingFilter;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.util.List;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity // 생략가능 관례적 등록
+@EnableMethodSecurity // 서비스의 @PreAuthorize를 동작시키기 위한 어노테이션
 public class SecurityConfig {
 
   /*
@@ -23,18 +38,32 @@ public class SecurityConfig {
   Spring bot의 기본 자동 설정 대신 '우리 규칙'이 적용됨
    */
   @Bean
-  public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+  public SecurityFilterChain securityFilterChain(HttpSecurity http, AuthenticationEntryPoint restAuthenticationEntryPoint, //빈등록 로직이 활성화 되어있으므로 받음
+                                                  AccessDeniedHandler restAccessDeniedHandler) throws Exception {
     http
         //REST API 는 브라우저 세션 폼이 아니라 클라이언트가 직접 요청하므로 지금단계에서는 CSRF 보호를 끈다. (세션 / 폼 기반으로 넘어갈 때 다시 다룸)
         .csrf(csrf -> csrf.disable())
+        // 등록한 CORS 규칙을 보안 필터에 연결해 사전 요청도 처리한다.
+        .cors(Customizer.withDefaults())
+
+        //xss 방어를 돕는 보안 응답 헤더 - Content-Security-Policy
+        //default-src 'self' = 기본적으로 같은 출처의 리소스만 허용 -> 외부 악성 스크립트 주입을 완화
+        .headers(headers -> headers.contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'")))
 
         //서버로 들어오는 요청 중 어떤 요청을 허용할 것인가에 대한 설정
         //경로별 인증 및 궈한 체크 진행이 가능
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
             .requestMatchers("/api/v1/me/**").hasRole("USER")
+            .requestMatchers(HttpMethod.POST, "/api/v1/activities/**","/api/activities/**").authenticated()
+            .requestMatchers(HttpMethod.PUT, "/api/v1/activities/**","/api/activities/**").authenticated()
+            .requestMatchers(HttpMethod.DELETE, "/api/v1/activities/**","/api/activities/**").authenticated()
             .anyRequest().permitAll()
         )
+        //필터단에서 발생한 커스텀 예외 처리 등록 로직
+        .exceptionHandling(ex -> ex
+            .authenticationEntryPoint(restAuthenticationEntryPoint)
+            .accessDeniedHandler(restAccessDeniedHandler))
         .httpBasic(Customizer.withDefaults())
         .addFilterBefore(new RequestIdFilter(), UsernamePasswordAuthenticationFilter.class)
         .addFilterAfter(new RequestLoggingFilter(), RequestIdFilter.class);
@@ -63,5 +92,42 @@ public class SecurityConfig {
     return RoleHierarchyImpl.withDefaultRolePrefix().role("ADMIN").implies("USER").build();
   }
 
+  // 미인증401 응답을 ProblemDetail JSON으로 커스텀할 수 있는 객체
+  @Bean
+  AuthenticationEntryPoint restAuthenticationEntryPoint(ObjectMapper objectMapper) {
+    return (request, response, authException) ->
+    {writeProblem(objectMapper, response, HttpStatus.UNAUTHORIZED, "AUTH_401","인증이 필요합니다. 로그인 후 다시 시도하세요");};
+  }
+  // 권한 부족 403 응답을 ProblemDetail JSON으로 커스텀 할 수 있는 객체
+  @Bean
+  AccessDeniedHandler restAccessDeniedHandler(ObjectMapper objectMapper) {
+    return (request, response, deniedException) ->
+    {writeProblem(objectMapper, response, HttpStatus.FORBIDDEN, "AUTH_403","작업을 수행할 권한이 없습니다.");};
+  }
+
+  /** 401/403 공통 — ProblemDetail 을 JSON 으로 직접 응답 본문에 쓴다. */
+  private static void writeProblem(ObjectMapper objectMapper, HttpServletResponse response,
+      HttpStatus status, String code, String detail) throws IOException {
+    ProblemDetail pd = ProblemDetail.forStatusAndDetail(status, detail);
+    pd.setProperty("code", code);
+    response.setStatus(status.value());
+    response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+    response.setCharacterEncoding("UTF-8");
+    objectMapper.writeValue(response.getWriter(), pd);
+  }
+
+  @Bean
+  CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration config = new CorsConfiguration();
+    //허용할 출처 (운영에서는 실제 프론트 도메인 주소)
+    config.setAllowedOrigins(List.of("http://localhost:63342", "http://localhost:3000"));
+    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+    config.setAllowedHeaders(List.of("*"));
+    config.setAllowCredentials(true);
+    // 모든 URL에 위 규칙을 적용한다.
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", config);
+    return source;
+  }
 
 }

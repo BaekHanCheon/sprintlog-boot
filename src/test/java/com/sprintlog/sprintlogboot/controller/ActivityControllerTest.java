@@ -22,6 +22,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
@@ -37,6 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest(ActivityController.class)
 @Import(SecurityConfig.class) // 우리 security 규칙을 테스트에도 적용
+@WithMockUser
 @DisplayName("ActivityController 웹 계층 테스트")
 class ActivityControllerTest {
 
@@ -111,18 +113,19 @@ class ActivityControllerTest {
 
   @Nested
   @DisplayName("POST (생성) - multipart(data + 선택 file)")
+  @org.springframework.security.test.context.support.WithMockUser(username = "owner@test.com")
   class Create {
 
     @Test
     @DisplayName("data 만 보내도 201 + Location (file 은 선택)")
     void 정상이면_201() throws Exception {
-      given(service.create(any(), any())).willReturn(sample);
+      given(service.create(any(), any(), eq("owner@test.com"))).willReturn(sample);
 
       MockMultipartFile data = new MockMultipartFile("data", "data.json",
           MediaType.APPLICATION_JSON_VALUE,
           """
           {"category":"LECTURE","title":"스프링 강의","minutes":30,"visibility":"PUBLIC","instructorName":"이강사"}
-          """.getBytes());
+          """.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
       mvc.perform(multipart("/api/v1/activities").file(data))
           .andExpect(status().isCreated())
@@ -135,19 +138,19 @@ class ActivityControllerTest {
     @Test
     @DisplayName("data + file 이면 201, 파일은 FileService로 저장된다.")
     void 파일첨부_201() throws Exception {
-      given(service.create(any(), any())).willReturn(sample);
+      given(service.create(any(), any(), eq("owner@test.com"))).willReturn(sample);
       given(fileService.saveFile(any())).willReturn("saved-uuid.png"); // 저장했다 치고 파일명 반환(가짜)
 
       MockMultipartFile data = new MockMultipartFile("data", "data.json",
           MediaType.APPLICATION_JSON_VALUE,
           """
           {"category":"LECTURE","title":"스프링 강의","minutes":30,"visibility":"PUBLIC","instructorName":"이강사"}
-          """.getBytes());
+          """.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
       // 가짜 이미지 데이터 추가 (실제 파일을 첨부할 필요는 전혀 없습니다. 컨트롤러가 그걸 신경쓰지 않고, FileService도 가짜입니다.)
       MockMultipartFile file
           = new MockMultipartFile("file", "proof.png",
-          MediaType.IMAGE_PNG_VALUE, "이미지-바이트-데이터".getBytes());
+          MediaType.IMAGE_PNG_VALUE, "이미지-바이트-데이터".getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
       mvc.perform(multipart("/api/v1/activities").file(data).file(file))
           .andExpect(status().isCreated())
@@ -164,19 +167,20 @@ class ActivityControllerTest {
           MediaType.APPLICATION_JSON_VALUE,
           """
           {"category":"LECTURE","title":"","minutes":30,"visibility":"PUBLIC","instructorName":"이강사"}
-          """.getBytes());
+          """.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
       mvc.perform(multipart("/api/v1/activities").file(data))
           .andExpect(status().isBadRequest())
           .andExpect(jsonPath("$.code").value("C001"))
           .andExpect(jsonPath("$.errors").exists());
 
-      verify(service, never()).create(any(), any());   // 검증에서 막혀서 서비스까지 못 감.
+      verify(service, never()).create(any(), any(), eq("owner@test.com"));   // 검증에서 막혀서 서비스까지 못 감.
     }
   }
 
   @Nested
   @DisplayName("수정(PUT)")
+  @org.springframework.security.test.context.support.WithMockUser(username = "owner@test.com")
   class Update {
 
     @Test
@@ -214,6 +218,7 @@ class ActivityControllerTest {
 
   @Nested
   @DisplayName("DELETE /{id} (삭제)")
+  @org.springframework.security.test.context.support.WithMockUser(username = "owner@test.com")
   class Delete {
 
     @Test
@@ -239,4 +244,81 @@ class ActivityControllerTest {
 
 
 
+
+  @Test
+  @org.springframework.security.test.context.support.WithAnonymousUser
+  void 미인증_쓰기_요청은_401_ProblemDetail() throws Exception {
+    for (String path : List.of("/api/v1/activities/1", "/api/activities/1")) {
+      for (String method : List.of("POST", "PUT", "DELETE")) {
+        mvc.perform(request(org.springframework.http.HttpMethod.valueOf(method), path))
+            .andExpect(status().isUnauthorized())
+            .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+            .andExpect(jsonPath("$.code").value("AUTH_401"))
+            .andExpect(jsonPath("$.detail").value("인증이 필요합니다. 로그인 후 다시 시도하세요"));
+      }
+    }
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  @org.springframework.security.test.context.support.WithMockUser
+  void 일반_사용자의_관리자_요청은_403_ProblemDetail() throws Exception {
+    mvc.perform(get("/api/v1/admin/test"))
+        .andExpect(status().isForbidden())
+        .andExpect(jsonPath("$.code").value("AUTH_403"))
+        .andExpect(jsonPath("$.detail").value("작업을 수행할 권한이 없습니다."));
+  }
+
+  @Test
+  @org.springframework.security.test.context.support.WithAnonymousUser
+  void 허용된_출처의_인증_사전요청은_통과한다() throws Exception {
+    for (String origin : List.of("http://localhost:63342", "http://localhost:3000")) {
+      for (String path : List.of("/api/v1/activities/1", "/api/activities/1")) {
+        mvc.perform(options(path)
+                .header("Origin", origin)
+                .header("Access-Control-Request-Method", "PUT")
+                .header("Access-Control-Request-Headers", "authorization,content-type"))
+            .andExpect(status().isOk())
+            .andExpect(header().string("Access-Control-Allow-Origin", origin))
+            .andExpect(header().string("Access-Control-Allow-Credentials", "true"))
+            .andExpect(header().string("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS"));
+      }
+    }
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  @org.springframework.security.test.context.support.WithAnonymousUser
+  void 허용하지_않은_출처와_메서드의_사전요청은_차단한다() throws Exception {
+    mvc.perform(options("/api/v1/activities")
+            .header("Origin", "https://untrusted.example")
+            .header("Access-Control-Request-Method", "POST"))
+        .andExpect(status().isForbidden())
+        .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+    mvc.perform(options("/api/v1/activities")
+            .header("Origin", "http://localhost:3000")
+            .header("Access-Control-Request-Method", "PATCH"))
+        .andExpect(status().isForbidden());
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  @org.springframework.security.test.context.support.WithAnonymousUser
+  void 허용된_출처도_쓰기에는_인증이_필요하다() throws Exception {
+    mvc.perform(delete("/api/v1/activities/1").header("Origin", "http://localhost:3000"))
+        .andExpect(status().isUnauthorized())
+        .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"))
+        .andExpect(jsonPath("$.code").value("AUTH_401"));
+    verifyNoInteractions(service);
+  }
+
+  @Test
+  @org.springframework.security.test.context.support.WithAnonymousUser
+  void 공개_조회에도_CSP와_CORS_헤더가_적용된다() throws Exception {
+    given(service.get(1L)).willReturn(sample);
+    mvc.perform(get("/api/v1/activities/1").header("Origin", "http://localhost:3000"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"))
+        .andExpect(header().string("Content-Security-Policy", "default-src 'self'"));
+  }
 }

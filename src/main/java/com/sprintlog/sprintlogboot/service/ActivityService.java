@@ -3,6 +3,7 @@ package com.sprintlog.sprintlogboot.service;
 import com.sprintlog.sprintlogboot.domain.ActivityAuditLog;
 import com.sprintlog.sprintlogboot.domain.ActivityCategory;
 import com.sprintlog.sprintlogboot.domain.LearningActivity;
+import com.sprintlog.sprintlogboot.domain.User;
 import com.sprintlog.sprintlogboot.domain.Visibility;
 import com.sprintlog.sprintlogboot.dto.request.CreateActivityRequest;
 import com.sprintlog.sprintlogboot.dto.request.UpdateActivityRequest;
@@ -11,6 +12,7 @@ import com.sprintlog.sprintlogboot.exception.ActivityArchiveException;
 import com.sprintlog.sprintlogboot.exception.ActivityNotFoundException;
 import com.sprintlog.sprintlogboot.repository.ActivityRepository;
 import com.sprintlog.sprintlogboot.repository.AuditLogRepository;
+import com.sprintlog.sprintlogboot.repository.UserRepository;
 import io.micrometer.core.annotation.Timed;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -18,6 +20,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.*;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,6 +38,7 @@ public class ActivityService {
     private final AuditLogRepository auditLogRepository;
     private final AuditService auditService;
     private final FileStorage fileStorage;
+    private final UserRepository userRepository;
 
     private final MeterRegistry meterRegistry;// 지표 수집기(Micrometer) - 커스텀 지표를 여기에 등록 후 증감시킨다.
 
@@ -85,10 +89,17 @@ public class ActivityService {
     }
 
     @Transactional
-    public LearningActivity create(CreateActivityRequest request, String savedFileName) {
+    public LearningActivity create(CreateActivityRequest request, String savedFileName, String ownerEmail) {
         return meterRegistry.timer("sprintlog.activity.create.time").record(() -> {
             LearningActivity activity = toActivity(request);
             activity.attachFile(savedFileName);
+
+
+            // 현재 로그인 사용자의 이메일로 User를 조회해서 활동에 붙인다.
+            // 이후 수정/삭제 인가 과정에서 이 소유자를 기준으로 권한을 파악한다.
+            User owner = userRepository.findByEmail(ownerEmail).orElseThrow(()->new IllegalStateException("인증된 사용자를 찾을 수 없습니다: " + ownerEmail));
+            activity.assignOwner(owner);
+
             LearningActivity saved = repository.save(activity);
             //카테고리 별로 태그를 쪼개서 생성된 활동 객체의 개수를 카운팅
             meterRegistry.counter("sprintlog.activities.created", "category", saved.getCategory().name()).increment();
@@ -114,6 +125,8 @@ public class ActivityService {
         return activity;
     }
 
+    // Role이 ADMIN 이거나, activityGuard.isOwner()가 true를 리턴한다면 허용, 나머지는 전부 403
+    @PreAuthorize("hasRole('ADMIN') or @activityGuard.isOwner(#id, authentication.name)")
     @Transactional // 메서드 레벨에 트랜잭션을 걸면 클래스 레벨보다 더 우선시됩니다.
     public LearningActivity update(Long id, @Valid UpdateActivityRequest request) {
         LearningActivity activity = repository.findById(id)
@@ -133,6 +146,7 @@ public class ActivityService {
     }
 
     @Transactional
+    @PreAuthorize("hasRole('ADMIN') or @activityGuard.isOwner(#id, authentication.name)")
     public void delete(Long id) {
         // 해당 id에 대한 데이터 존재 여부 확인
         LearningActivity activity = repository.findById(id) .orElseThrow(() -> new ActivityNotFoundException(id));

@@ -5,15 +5,18 @@ import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 import com.sprintlog.sprintlogboot.domain.ActivityCategory;
 import com.sprintlog.sprintlogboot.domain.LearningActivity;
+import com.sprintlog.sprintlogboot.domain.User;
 import com.sprintlog.sprintlogboot.domain.Visibility;
 import com.sprintlog.sprintlogboot.dto.request.CreateActivityRequest;
 import com.sprintlog.sprintlogboot.repository.ActivityRepository;
 import com.sprintlog.sprintlogboot.repository.AuditLogRepository;
+import com.sprintlog.sprintlogboot.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 
 //서비스계층의 통합 테스트 (컨트롤러 미포함)
@@ -28,11 +31,17 @@ public class ActivityServiceIntegration {
   ActivityRepository activityRepository;
   @Autowired
   AuditLogRepository auditLogRepository;
+  @Autowired
+  UserRepository userRepository;
+  @Autowired
+  PasswordEncoder passwordEncoder;
 
   @BeforeEach
   void clean(){
     activityRepository.deleteAll();
     auditLogRepository.deleteAll();
+    userRepository.deleteAll();
+    userRepository.save(new User("소유자", "owner@test.com"));
   }
 
   @Test
@@ -41,7 +50,7 @@ public class ActivityServiceIntegration {
     // create(request, savedFileName) — 파일 없으면 두 번째 인자 null.
     LearningActivity saved = service.create(new CreateActivityRequest(
         ActivityCategory.LECTURE, "통합 테스트 강의", 60, Visibility.PUBLIC,
-        null, null, "이강사", null, null), null);
+        null, null, "이강사", null, null), null, "owner@test.com");
 
     // 진짜 DB 에서 다시 꺼내 확인(가짜라면 못 하는, 실제 영속 검증).
     assertThat(saved.getId()).isNotNull();
@@ -95,5 +104,50 @@ public class ActivityServiceIntegration {
 
     assertThat(activityRepository.count()).isEqualTo(activitiesBefore);      // 활동은 롤백(변화 없음)
     assertThat(auditLogRepository.count()).isEqualTo(logsBefore + 1);        // 시도 이력은 남음(독립 트랜잭션)
+  }
+
+  private LearningActivity ownedActivity() {
+    return service.create(new CreateActivityRequest(
+        ActivityCategory.LECTURE, "권한 검사", 30, Visibility.PUBLIC,
+        null, null, "이강사", null, null), null, "owner@test.com");
+  }
+
+  @Test
+  @org.springframework.security.test.context.support.WithMockUser(username = "owner@test.com")
+  void 소유자는_수정하고_삭제할_수_있다() {
+    LearningActivity activity = ownedActivity();
+    service.update(activity.getId(), new com.sprintlog.sprintlogboot.dto.request.UpdateActivityRequest("수정", Visibility.PUBLIC));
+    service.delete(activity.getId());
+    assertThat(activityRepository.existsById(activity.getId())).isFalse();
+  }
+
+  @Test
+  @org.springframework.security.test.context.support.WithMockUser(username = "other@test.com")
+  void 다른_사용자는_수정과_삭제가_거부된다() {
+    LearningActivity activity = ownedActivity();
+    assertThatThrownBy(() -> service.update(activity.getId(),
+        new com.sprintlog.sprintlogboot.dto.request.UpdateActivityRequest("수정", Visibility.PUBLIC)))
+        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    assertThatThrownBy(() -> service.delete(activity.getId()))
+        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+    assertThat(activityRepository.existsById(activity.getId())).isTrue();
+  }
+
+  @Test
+  @org.springframework.security.test.context.support.WithMockUser(username = "admin@test.com", roles = "ADMIN")
+  void 관리자는_다른_소유자의_활동도_수정하고_삭제한다() {
+    LearningActivity activity = ownedActivity();
+    service.update(activity.getId(), new com.sprintlog.sprintlogboot.dto.request.UpdateActivityRequest("관리자 수정", Visibility.PUBLIC));
+    service.delete(activity.getId());
+    assertThat(activityRepository.existsById(activity.getId())).isFalse();
+  }
+
+  @Test
+  @org.springframework.security.test.context.support.WithMockUser(username = "owner@test.com")
+  void 소유자_없는_활동은_일반_사용자에게_거부된다() {
+    LearningActivity activity = activityRepository.save(new LearningActivity(
+        ActivityCategory.LECTURE, "소유자 없음", 30, Visibility.PUBLIC, "이강사", null, null));
+    assertThatThrownBy(() -> service.delete(activity.getId()))
+        .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
   }
 }

@@ -18,6 +18,7 @@ import jakarta.validation.Valid;
 import org.springframework.hateoas.EntityModel;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -90,7 +91,8 @@ public interface ActivityControllerDocs {
     @PostMapping
     public ResponseEntity<EntityModel<ActivityResponse>> create(
             @Valid @RequestPart("data") CreateActivityRequest request,
-            @RequestPart(value = "file", required = false) MultipartFile file);
+            @RequestPart(value = "file", required = false) MultipartFile file,
+        Authentication authentication);
 
     // 활동 수정. 자원 식별은 Path(/{id}), 변경할 내용은 본문(UpdateActivityRequest)
     // 대상이 없으면 404, 있으면 제목, 공개여부를 변경하고 200.

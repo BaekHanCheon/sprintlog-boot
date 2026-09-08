@@ -8,6 +8,7 @@ import com.sprintlog.sprintlogboot.dto.request.UpdateActivityRequest;
 import com.sprintlog.sprintlogboot.exception.ActivityNotFoundException;
 import com.sprintlog.sprintlogboot.repository.ActivityRepository;
 import com.sprintlog.sprintlogboot.repository.AuditLogRepository;
+import com.sprintlog.sprintlogboot.repository.UserRepository;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.assertj.core.api.Assertions;
@@ -35,6 +36,7 @@ class ActivityServiceTest {
   @Mock AuditLogRepository auditLogRepository;
   @Mock AuditService auditService;
   @Mock FileStorage fileStorage;
+  @Mock UserRepository userRepository;
 
   // 서비스의 create는 timer가 걸려 있음 -> MeterRegistry의 timer는 실제로 동작해야 합니다. (Mock 안됨!)
   // @Spy를 걸어서 실제 기능이 동작할 수 있는 객체로 둔다.
@@ -181,7 +183,9 @@ class ActivityServiceTest {
       given(repository.save(any(LearningActivity.class))).willAnswer(inv -> inv.getArgument(0));
 
       // when
-      service.create(request, null);
+      var owner = new com.sprintlog.sprintlogboot.domain.User("소유자", "owner@test.com");
+      given(userRepository.findByEmail("owner@test.com")).willReturn(Optional.of(owner));
+      service.create(request, null, "owner@test.com");
       ArgumentCaptor<LearningActivity> captor = ArgumentCaptor.forClass(LearningActivity.class);
 
       // then
@@ -189,6 +193,7 @@ class ActivityServiceTest {
       LearningActivity saved = captor.getValue(); // 붙잡은 Entity를 돌려준다.
 
       // 내가 전달한 DTO의 값으로 Entity가 잘 매핑 되었는지를 단언을 통해 검증
+      assertThat(saved.getOwner()).isSameAs(owner);
       assertThat(saved.getTitle()).isEqualTo(request.title());
       assertThat(saved.getCategory()).isEqualTo(ActivityCategory.LECTURE);
       assertThat(saved.getMinutes()).isEqualTo(45);
