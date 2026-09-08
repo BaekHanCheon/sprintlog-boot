@@ -33,6 +33,14 @@ spring:
 
 server:
   port: 8080
+  servlet:
+    session:
+      # 세션 타임아웃 - 이 시간 동안 요청이 없으면 세션이 만료된다 (기본 30분)
+      # 만료된 세션 쿠키로 다시 접근하면 '무효 세션' 처리되어 invalidSessionUrl로 넘어감
+      timeout: 30m
+      cookie:
+        http-only: true #JSESSIONID 쿠키를 JS로 읽지 못하게 (XSS 세션 탈취 방어)
+        secure: false # https 환경에서만 JSESSIONID 쿠키를 전달
 
 management:
   endpoints:
