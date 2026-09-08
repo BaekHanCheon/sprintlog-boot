@@ -53,6 +53,7 @@ public class SecurityConfig {
         //서버로 들어오는 요청 중 어떤 요청을 허용할 것인가에 대한 설정
         //경로별 인증 및 궈한 체크 진행이 가능
         .authorizeHttpRequests(auth -> auth
+            .requestMatchers(HttpMethod.POST,"api/v1/users").permitAll() //없어도되지만 명시적으로 허용
             .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
             .requestMatchers("/api/v1/me/**").hasRole("USER")
             .requestMatchers(HttpMethod.POST, "/api/v1/activities/**","/api/activities/**").authenticated()
