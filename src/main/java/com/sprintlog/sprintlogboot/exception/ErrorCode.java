@@ -11,6 +11,7 @@ public enum ErrorCode {
 
   // ── 사용자(User) 도메인 — U로 시작 ──────────────────────────────
   EMAIL_ALREADY_EXISTS("U001", HttpStatus.CONFLICT,"이미 사용중인 이메일입니다."),
+  USER_NOT_FOUND("U002", HttpStatus.NOT_FOUND, "사용자를 찾을 수 없습니다."),
 
   // ── 공통(Common) — C로 시작 ──────────────────────────────────────
   INVALID_INPUT     ("C001", HttpStatus.BAD_REQUEST,       "입력값이 올바르지 않습니다."),

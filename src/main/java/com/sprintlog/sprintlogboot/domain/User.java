@@ -80,6 +80,10 @@ public class User extends BaseEntity {
         this.password = password;
         this.role = role;
     }
+
+  public void changeRole(Role newRole) {
+        this.role = newRole;
+  }
 }
 
 
