@@ -135,12 +135,14 @@ public class SecurityConfig {
                 // 폼 로그인 (세션 기반)을 켠다.
                 // 한 번 로그인하면 서버가 세션을 만들고 JSESSIONID 쿠키를 발급한다.
                 // 이후 요청은 그 쿠키만으로 인증 유지된다 - 상태 유지(stateful) 방식
-                .formLogin(form -> form
+                /* .formLogin(form -> form
                         .loginProcessingUrl("/login") // 폼이 POST 처리되는 URL(Spring이 가로챔)
                         .successHandler(loginSuccessHandler)
                         .failureHandler(loginFailureHandler)
                         .permitAll() // 로그인 요청은 누구나 접근 가능
                 )
+
+                 */
 
                 .rememberMe(remember -> remember
                         .key("sprintlog-rememberme-secret-key") // 토큰 서명에 사용하는 비밀 키.
