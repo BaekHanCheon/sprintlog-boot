@@ -31,6 +31,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.BDDMockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -133,7 +134,7 @@ class ActivityControllerTest {
                     {"category":"LECTURE","title":"스프링 강의","minutes":30,"visibility":"PUBLIC","instructorName":"이강사"}
                     """.getBytes());
 
-            mvc.perform(multipart("/api/v1/activities").file(data))
+            mvc.perform(multipart("/api/v1/activities").file(data).with(csrf()))
                     .andExpect(status().isCreated())
                     .andExpect(header().string("Location", "/api/activities/1"))
                     .andExpect(jsonPath("$.title").value("스프링 강의"));
@@ -158,7 +159,7 @@ class ActivityControllerTest {
                     = new MockMultipartFile("file", "proof.png",
                     MediaType.IMAGE_PNG_VALUE, "이미지-바이트-데이터".getBytes());
 
-            mvc.perform(multipart("/api/v1/activities").file(data).file(file))
+            mvc.perform(multipart("/api/v1/activities").file(data).file(file).with(csrf()))
                     .andExpect(status().isCreated())
                     .andExpect(header().string("Location", "/api/activities/1"))
                     .andExpect(jsonPath("$.title").value("스프링 강의"));
@@ -175,7 +176,7 @@ class ActivityControllerTest {
                     {"category":"LECTURE","title":"","minutes":30,"visibility":"PUBLIC","instructorName":"이강사"}
                     """.getBytes());
 
-            mvc.perform(multipart("/api/v1/activities").file(data))
+            mvc.perform(multipart("/api/v1/activities").file(data).with(csrf()))
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.code").value("C001"))
                     .andExpect(jsonPath("$.errors").exists());

@@ -12,12 +12,12 @@ import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -74,8 +74,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         request.setAttribute(ATTR_JWT_ERROR, ERROR_EXPIRED);
         log.debug("[JWT] 만료된 토큰으로 접근 - {}", e.getMessage());
       }catch (JwtException | IllegalArgumentException e) {
-        request.setAttribute(ATTR_JWT_ERROR, ERROR_EXPIRED);
+        request.setAttribute(ATTR_JWT_ERROR, ERROR_INVALID);
         log.debug("[JWT] 유효하지 않은 토큰으로 접근 - {}", e.getMessage());
+      }catch (UsernameNotFoundException e) {
+        request.setAttribute(ATTR_JWT_ERROR, ERROR_INVALID);
+        log.debug("[JWT] 토큰의 사용자가 존재하지 않음 - {}", e.getMessage());
       }
     }
 
@@ -85,7 +88,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private String resolveToken(HttpServletRequest request) {
     String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-    if (header == null || !header.startsWith(BEARER_PREFIX)) {
+    if (header != null && header.startsWith(BEARER_PREFIX)) {
       return header.substring(BEARER_PREFIX.length());
     }
     return null;

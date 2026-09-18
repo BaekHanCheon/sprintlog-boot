@@ -5,6 +5,7 @@ import com.sprintlog.sprintlogboot.domain.User;
 import com.sprintlog.sprintlogboot.repository.ActivityRepository;
 import com.sprintlog.sprintlogboot.repository.AuditLogRepository;
 import com.sprintlog.sprintlogboot.repository.UserRepository;
+import com.sprintlog.sprintlogboot.support.CsrfTestSupport;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -115,6 +116,7 @@ public class ActivityE2ETest {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA); // 전체 요청은 multipart/form-data 요청이다.
+        attachCsrf(headers);
 
         // TestRestTemplate에게 POST요청을 보내라고 명령합니다.
         // postForEntity(요청 보낼 url, 헤더와 바디 정보를 담은 HttpEntity, 응답 본문을 어떤 타입으로 받을 지)
@@ -138,6 +140,7 @@ public class ActivityE2ETest {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA); // 전체 요청은 multipart/form-data 요청이다.
+        attachCsrf(headers);
 
         return rest.withBasicAuth("choon@naver.com", "password123")
                 .postForEntity(base, new HttpEntity<>(parts, headers), String.class);
@@ -147,7 +150,15 @@ public class ActivityE2ETest {
     private HttpEntity<String> json(String body) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
+        attachCsrf(headers);
         return new HttpEntity<>(body, headers);
+    }
+
+    private void attachCsrf(HttpHeaders headers) {
+        String token = CsrfTestSupport.fetchToken(rest.getRestTemplate(), "http://localhost:" + port);
+        assertThat(token).as("CSRF token cookie").isNotBlank();
+        headers.add(HttpHeaders.COOKIE, CsrfTestSupport.COOKIE_NAME + "=" + token);
+        headers.add(CsrfTestSupport.HEADER_NAME, token);
     }
 
     @Test
@@ -247,7 +258,7 @@ public class ActivityE2ETest {
 
         // 4) 삭제(DELETE) → 204(본문 없음)
         ResponseEntity<Void> deleted = rest.withBasicAuth("choon@naver.com", "password123")
-                .exchange(one, HttpMethod.DELETE, null, Void.class);
+                .exchange(one, HttpMethod.DELETE, json(null), Void.class);
         assertThat(deleted.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
 
         // 5) 다시 조회 → 이제 없다(404). 삭제까지 전 계층으로 이어져 반영됨.
@@ -258,8 +269,6 @@ public class ActivityE2ETest {
 
 
 }
-
-
 
 
 
