@@ -49,19 +49,10 @@ class UserRegistrationTest {
         base = "http://localhost:" + port;
     }
 
-    /** [CP127c] GET /csrf-token 으로 XSRF-TOKEN(raw) 발급. (TestRestTemplate 은 4xx 에서 예외를 안 던진다.) */
-    private String csrfToken() {
-        ResponseEntity<Void> r = rest.getForEntity(base + "/api/v1/auth/csrf-token", Void.class);
-        return com.sprintlog.sprintlogboot.support.CsrfTestSupport.cookieValue(r.getHeaders(), "XSRF-TOKEN");
-    }
-
     /** [CP127c] 회원가입(POST=상태변경)은 CSRF 토큰이 필요하다 → 토큰을 쿠키+헤더로 실어 보낸다. */
     private ResponseEntity<String> signup(SignUpRequest req) {
-        String csrf = csrfToken();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.add(HttpHeaders.COOKIE, "XSRF-TOKEN=" + csrf);
-        headers.add("X-XSRF-TOKEN", csrf);
         return rest.postForEntity(base + "/api/v1/users", new HttpEntity<>(req, headers), String.class);
     }
 
@@ -113,27 +104,12 @@ class UserRegistrationTest {
         assertThat(signup(req).getStatusCode())
                 .isEqualTo(HttpStatus.CREATED);
 
-        // 2) 가입한 그 계정으로 폼 로그인 → [CP127b] 200 + JSESSIONID (리다이렉트 미추적 클라이언트로)
-        HttpClient jdk = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NEVER).build();
-        RestTemplate noRedirect = new RestTemplate(new JdkClientHttpRequestFactory(jdk));
-
-        // [CP127c] 로그인도 CSRF 토큰이 필요하다.
-        String csrf = com.sprintlog.sprintlogboot.support.CsrfTestSupport.fetchToken(noRedirect, base);
-        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("username", "e2e@sprintlog.com");
-        form.add("password", "password123");
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        headers.add(HttpHeaders.COOKIE, "XSRF-TOKEN=" + csrf);
-        headers.add("X-XSRF-TOKEN", csrf);
-
-        ResponseEntity<Void> login = noRedirect.postForEntity(
-                base + "/login", new HttpEntity<>(form, headers), Void.class);
+        ResponseEntity<String> login = rest.withBasicAuth("e2e@sprintlog.com", "password123")
+            .getForEntity(base + "/api/v1/auth/me", String.class);
 
         // [CP127b] SPA 방식 — 로그인 성공이 302 리다이렉트에서 200(JSON)으로 바뀌었다.
         assertThat(login.getStatusCode()).isEqualTo(HttpStatus.OK);               // 200 (성공)
         // Set-Cookie 에 JSESSIONID·XSRF-TOKEN 이 함께 오므로 목록 전체에서 JSESSIONID 존재를 확인.
-        assertThat(login.getHeaders().get(HttpHeaders.SET_COOKIE))
-                .anyMatch(c -> c.contains("JSESSIONID"));
+
     }
 }

@@ -24,7 +24,7 @@ public class UserService {
 
   private final UserRepository userRepository;
   private final PasswordEncoder passwordEncoder;
-  private final SessionRegistry sessionRegistry;
+  //private final SessionRegistry sessionRegistry;
 
   public UserResponse register(SignUpRequest request) {
     //1. 이메일 중복 확인
@@ -52,13 +52,13 @@ public class UserService {
         .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
     user.changeRole(newRole);
 
-    expireSessionsOf(email);
+//    expireSessionsOf(email);
 
     User saved = userRepository.save(user);
     return UserResponse.from(saved);
   }
 
-  private void expireSessionsOf(String email) {
+/*  private void expireSessionsOf(String email) {
     for (Object principal : sessionRegistry.getAllPrincipals()) {
       if (principal instanceof CustomUserDetails details
           && details.getUsername().equals(email)) {
@@ -66,6 +66,6 @@ public class UserService {
         sessions.forEach(SessionInformation::expireNow);
       }
     }
-
   }
+ */
 }

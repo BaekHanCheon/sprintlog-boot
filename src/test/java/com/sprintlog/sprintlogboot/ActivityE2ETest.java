@@ -5,7 +5,6 @@ import com.sprintlog.sprintlogboot.domain.User;
 import com.sprintlog.sprintlogboot.repository.ActivityRepository;
 import com.sprintlog.sprintlogboot.repository.AuditLogRepository;
 import com.sprintlog.sprintlogboot.repository.UserRepository;
-import com.sprintlog.sprintlogboot.support.CsrfTestSupport;
 import org.assertj.core.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -116,7 +115,7 @@ public class ActivityE2ETest {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA); // 전체 요청은 multipart/form-data 요청이다.
-        attachCsrf(headers);
+
 
         // TestRestTemplate에게 POST요청을 보내라고 명령합니다.
         // postForEntity(요청 보낼 url, 헤더와 바디 정보를 담은 HttpEntity, 응답 본문을 어떤 타입으로 받을 지)
@@ -140,7 +139,6 @@ public class ActivityE2ETest {
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA); // 전체 요청은 multipart/form-data 요청이다.
-        attachCsrf(headers);
 
         return rest.withBasicAuth("choon@naver.com", "password123")
                 .postForEntity(base, new HttpEntity<>(parts, headers), String.class);
@@ -150,16 +148,9 @@ public class ActivityE2ETest {
     private HttpEntity<String> json(String body) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        attachCsrf(headers);
         return new HttpEntity<>(body, headers);
     }
 
-    private void attachCsrf(HttpHeaders headers) {
-        String token = CsrfTestSupport.fetchToken(rest.getRestTemplate(), "http://localhost:" + port);
-        assertThat(token).as("CSRF token cookie").isNotBlank();
-        headers.add(HttpHeaders.COOKIE, CsrfTestSupport.COOKIE_NAME + "=" + token);
-        headers.add(CsrfTestSupport.HEADER_NAME, token);
-    }
 
     @Test
     @DisplayName("생성->조회 왕복 - POST로 만든 활동을 그 Location으로 다시 GET 하면 같은 활동이 온다.")

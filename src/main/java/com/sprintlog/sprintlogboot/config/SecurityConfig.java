@@ -4,9 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sprintlog.sprintlogboot.filter.RequestIdFilter;
 import com.sprintlog.sprintlogboot.filter.RequestLoggingFilter;
 import com.sprintlog.sprintlogboot.security.JwtAuthenticationFilter;
-import com.sprintlog.sprintlogboot.security.LoginFailureHandler;
-import com.sprintlog.sprintlogboot.security.LoginSuccessHandler;
-import com.sprintlog.sprintlogboot.security.SpaCsrfTokenRequestHandler;
+// import com.sprintlog.sprintlogboot.security.LoginFailureHandler;
+// import com.sprintlog.sprintlogboot.security.LoginSuccessHandler;
+// import com.sprintlog.sprintlogboot.security.SpaCsrfTokenRequestHandler;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,7 +16,9 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchy;
 import org.springframework.security.access.hierarchicalroles.RoleHierarchyImpl;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -86,9 +88,10 @@ public class SecurityConfig {
             // 이 안에서 경로별 인증 및 권한 체크 진행이 가능가
             .authorizeHttpRequests(auth -> auth
                 // ── 공개(permitAll) — 로그인 전에도 되어야 하는 것들 ──
-                .requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf-token").permitAll()  // CSRF 토큰 발급
+                //.requestMatchers(HttpMethod.GET, "/api/v1/auth/csrf-token").permitAll()  // CSRF 토큰 발급
                 .requestMatchers(HttpMethod.POST, "/api/v1/users").permitAll()           // 회원가입
-                .requestMatchers("/login", "/logout").permitAll()                        // 로그인·로그아웃 처리
+                //.requestMatchers("/login", "/logout").permitAll()                        // 로그인·로그아웃 처리
+                .requestMatchers("/api/v1/auth/login").permitAll()                        // 로그인·로그아웃 처리
                 .requestMatchers(HttpMethod.GET, "/api/v1/auth/whoami").permitAll()       // 익명 확인용 데모
                 .requestMatchers(HttpMethod.GET, "/api/v1/activities/**", "/api/activities/**").permitAll() // 활동 조회는 공개(SprintLog 도메인)
                 .requestMatchers("/", "/login.html", "/index.html", "/favicon.svg", "/assets/**").permitAll() // 정적 리소스
@@ -179,20 +182,26 @@ public class SecurityConfig {
     }
 
     @Bean
-    public SessionRegistry sessionRegistry() {
-        return new SessionRegistryImpl();
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+        return configuration.getAuthenticationManager();
     }
 
-    @Bean
-    AuthenticationSuccessHandler loginSuccessHandler(ObjectMapper objectMapper) {
-        return new LoginSuccessHandler(objectMapper);
-    }
-
-    @Bean
-    AuthenticationFailureHandler loginFailureHandler(ObjectMapper objectMapper) {
-        return new LoginFailureHandler(objectMapper);
-    }
-
+    // 세션 전용 빈: JWT 전환 후에는 등록하지 않는다.
+//     @Bean
+//     public SessionRegistry sessionRegistry() {
+//         return new SessionRegistryImpl();
+//     }
+//
+//     @Bean
+//     AuthenticationSuccessHandler loginSuccessHandler(ObjectMapper objectMapper) {
+//         return new LoginSuccessHandler(objectMapper);
+//     }
+//
+//     @Bean
+//     AuthenticationFailureHandler loginFailureHandler(ObjectMapper objectMapper) {
+//         return new LoginFailureHandler(objectMapper);
+//     }
+//
     /*
     static인 이유: 이 계층 빈은 보안 인프라가 초기화되는 설정 단계에 확실하게 잡혀야 한다.
     static으로 선언하면 다른 빈의 조기 초기화 부작용 없이 이를 보장받을 수 있다.
@@ -206,10 +215,26 @@ public class SecurityConfig {
     }
 
     // 미인증(401) 응답을 ProblemDetail JSON으로 커스텀할 수 있는 객체.
+//    @Bean
+//    AuthenticationEntryPoint restAuthenticationEntryPoint(ObjectMapper objectMapper) {
+//        return (request, response, authException) ->
+//                writeProblem(objectMapper, response, HttpStatus.UNAUTHORIZED, "AUTH_401", "인증이 필요합니다. 로그인 후 다시 시도하세요.");
+//    }
     @Bean
     AuthenticationEntryPoint restAuthenticationEntryPoint(ObjectMapper objectMapper) {
-        return (request, response, authException) ->
-                writeProblem(objectMapper, response, HttpStatus.UNAUTHORIZED, "AUTH_401", "인증이 필요합니다. 로그인 후 다시 시도하세요.");
+        return (request, response, authException) -> {
+            Object jwtError = request.getAttribute(JwtAuthenticationFilter.ATTR_JWT_ERROR);
+            if (JwtAuthenticationFilter.ERROR_EXPIRED.equals(jwtError)) {
+                writeProblem(objectMapper, response, HttpStatus.UNAUTHORIZED,
+                    "AUTH_401_EXPIRED", "토큰이 만료되었습니다. 다시 로그인해 주세요.");
+            } else if (JwtAuthenticationFilter.ERROR_INVALID.equals(jwtError)) {
+                writeProblem(objectMapper, response, HttpStatus.UNAUTHORIZED,
+                    "AUTH_401_INVALID", "유효하지 않은 토큰입니다.");
+            } else {
+                writeProblem(objectMapper, response, HttpStatus.UNAUTHORIZED,
+                    "AUTH_401", "인증이 필요합니다. 로그인 후 다시 시도하세요.");
+            }
+        };
     }
 
     // 권한 부족(403) 응답을 ProblemDetail JSON으로 커스텀할 수 있는 객체.
@@ -233,10 +258,10 @@ public class SecurityConfig {
 
     // 서블릿 컨테이너의 세션 생성/소멸을 Spring 이벤트로 발행한다.
     // 동시 세션 제어에서도 세션 개수를 추적하려면 이 publisher가 필요하다.
-    @Bean
-    HttpSessionEventPublisher httpSessionEventPublisher() {
-        return new HttpSessionEventPublisher();
-    }
+//     @Bean
+//     HttpSessionEventPublisher httpSessionEventPublisher() {
+//         return new HttpSessionEventPublisher();
+//     }
 
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
@@ -256,8 +281,6 @@ public class SecurityConfig {
 
 
 }
-
-
 
 
 

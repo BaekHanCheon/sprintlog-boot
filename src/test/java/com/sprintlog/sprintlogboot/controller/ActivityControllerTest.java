@@ -1,11 +1,14 @@
 package com.sprintlog.sprintlogboot.controller;
 
+import com.sprintlog.sprintlogboot.config.AppConfig;
 import com.sprintlog.sprintlogboot.config.SecurityConfig;
 import com.sprintlog.sprintlogboot.domain.ActivityCategory;
 import com.sprintlog.sprintlogboot.domain.LearningActivity;
 import com.sprintlog.sprintlogboot.domain.Visibility;
 import com.sprintlog.sprintlogboot.dto.request.UpdateActivityRequest;
 import com.sprintlog.sprintlogboot.exception.ActivityNotFoundException;
+import com.sprintlog.sprintlogboot.security.JwtAuthenticationFilter;
+import com.sprintlog.sprintlogboot.security.JwtProvider;
 import com.sprintlog.sprintlogboot.service.ActivityDashboard;
 import com.sprintlog.sprintlogboot.service.ActivityService;
 import com.sprintlog.sprintlogboot.service.FileService;
@@ -36,7 +39,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ActivityController.class)
-@Import(SecurityConfig.class) // 우리 security 규칙을 테스트에도 적용해라
+@Import({SecurityConfig.class, AppConfig.class, JwtProvider.class, JwtAuthenticationFilter.class}) // 우리 security 규칙을 테스트에도 적용해라
 // POST/PUT/DELETE 요청은 인증을 요구하게 됐으므로 웹 계층 테스트에 기본 인증 사용자를 부여합니다.
 @WithMockUser
 @DisplayName("ActivityController 웹 계층 테스트")

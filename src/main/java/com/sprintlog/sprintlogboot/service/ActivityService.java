@@ -126,7 +126,8 @@ public class ActivityService {
     }
 
     // Role이 ADMIN 이거나, activityGuard.isOwner()가 true를 리턴한다면 허용, 나머지는 전부 403
-    @PreAuthorize("hasRole('ADMIN') or @activityGuard.isOwner(#id, authentication.name)")
+    // @PreAuthorize("hasRole('ADMIN') or @activityGuard.isOwner(#id, authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or @activityGuard.isOwner(#id, authentication.principal.id)")
     @Transactional // 메서드 레벨에 트랜잭션을 걸면 클래스 레벨보다 더 우선시됩니다.
     public LearningActivity update(Long id, @Valid UpdateActivityRequest request) {
         LearningActivity activity = repository.findById(id)
@@ -146,7 +147,8 @@ public class ActivityService {
     }
 
     @Transactional
-    @PreAuthorize("hasRole('ADMIN') or @activityGuard.isOwner(#id, authentication.name)")
+    // @PreAuthorize("hasRole('ADMIN') or @activityGuard.isOwner(#id, authentication.name)")
+    @PreAuthorize("hasRole('ADMIN') or @activityGuard.isOwner(#id, authentication.principal.id)")
     public void delete(Long id) {
         // 해당 id에 대한 데이터 존재 여부 확인
         LearningActivity activity = repository.findById(id) .orElseThrow(() -> new ActivityNotFoundException(id));

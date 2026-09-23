@@ -1,15 +1,19 @@
 package com.sprintlog.sprintlogboot.controller;
 
-import com.sprintlog.sprintlogboot.dto.response.UserResponse;
-import com.sprintlog.sprintlogboot.security.CustomUserDetails;
-import org.springframework.http.ResponseEntity;
+import com.sprintlog.sprintlogboot.dto.request.LoginRequest;
+import com.sprintlog.sprintlogboot.dto.response.TokenResponse;
+import com.sprintlog.sprintlogboot.security.JwtPrincipal;
+import com.sprintlog.sprintlogboot.service.AuthService;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -18,7 +22,10 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/auth")
+@RequiredArgsConstructor
 public class AuthController {
+    
+    private final AuthService authService;
 
     @GetMapping("/whoami")
     public Map<String, Object> whoami() {
@@ -42,24 +49,30 @@ public class AuthController {
         );
     }
 
-    @GetMapping("/me")
+    /*@GetMapping("/me")
     public UserResponse me(@AuthenticationPrincipal CustomUserDetails principal) {
         return UserResponse.from(principal.getUser());
     }
+     */
+    @GetMapping("/me")
+    public Map<String, JwtPrincipal> me(@AuthenticationPrincipal JwtPrincipal principal) {
+        return Map.of("data",principal);
+    }
 
-    @GetMapping("/csrf-token")
+/*    @GetMapping("/csrf-token")
     public ResponseEntity<Object> csrfToken(CsrfToken csrfToken) {
         csrfToken.getToken();
         // 내용은 딱히 없고, csrf토큰을 한번 더 가져오라는 명령을 내립니다.
         // 이 요청이 들어오는 과정에서 필터가 동작해 자동으로 쿠키를 생성합니다.
         return ResponseEntity.noContent().build();
     }
+ */
 
-
+    @PostMapping("login")
+    public TokenResponse login(@Valid @RequestBody LoginRequest request) {
+        return authService.login(request);
+    }
 }
-
-
-
 
 
 

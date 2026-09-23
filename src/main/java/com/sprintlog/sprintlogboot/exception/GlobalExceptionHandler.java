@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -92,6 +93,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail handleAccessDenied(AccessDeniedException e) {
         return problem(HttpStatus.FORBIDDEN, ErrorCode.ACCESS_DENIED.getCode(), e.getMessage(),"권한 없음");
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ProblemDetail handleAuthentication(AuthenticationException e) {
+        log.warn("[AUTH] 로그인 실패 - {}: {}", e.getClass().getSimpleName(), e.getMessage());
+        return problem(HttpStatus.UNAUTHORIZED, "AUTH_401_BAD_CREDENTIALS",
+            "이메일 또는 비밀번호가 올바르지 않습니다.", "인증 실패");
     }
 
     // 500 — 그 밖의 예상 못 한 오류. 원본 메시지는 로그에만, 클라이언트엔 안전한 문구만

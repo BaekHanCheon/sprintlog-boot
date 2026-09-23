@@ -3,6 +3,7 @@ package com.sprintlog.sprintlogboot.lifecycle;
 import com.sprintlog.sprintlogboot.config.SprintLogProperties;
 import com.sprintlog.sprintlogboot.domain.*;
 import com.sprintlog.sprintlogboot.repository.ActivityRepository;
+import com.sprintlog.sprintlogboot.repository.AuditLogRepository;
 import com.sprintlog.sprintlogboot.repository.UserRepository;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -22,6 +23,7 @@ public class DataInitializer {
     private final SprintLogProperties properties;
     // 우리가 직접 UserRepository 빈 등록은 하지 않았지만, Spring Data JPA가 이미 구현체를 빈으로 등록해 놓았습니다.
     private final UserRepository userRepository;
+    private final AuditLogRepository auditLogRepository;
     //비밀번호 암호화를 위한 빈 주입
     private final PasswordEncoder passwordEncoder;
 
@@ -71,6 +73,14 @@ public class DataInitializer {
         }
 
         log.info("[lifecycle] 샘플 데이터 적재 완료 — 총 {}개", repository.count());
+
+        if (auditLogRepository.count() == 0) {
+            auditLogRepository.save(new ActivityAuditLog("ACTIVITY_CREATE", "활동 등록 - '스프링 시큐리티 강의' (choon@naver.com)"));
+            auditLogRepository.save(new ActivityAuditLog("ACTIVITY_UPDATE", "활동 수정 - 학습 시간 30분 → 60분 (choon@naver.com)"));
+            auditLogRepository.save(new ActivityAuditLog("ACTIVITY_DELETE", "활동 삭제 - '읽다 만 책' (hong@gmail.com)"));
+            auditLogRepository.save(new ActivityAuditLog("ROLE_CHANGE", "권한 변경 - hong@gmail.com: USER → ADMIN (관리자 수행)"));
+            log.info("[lifecycle] 감사 로그 샘플 {}건 생성", auditLogRepository.count());
+        }
 
 
         log.info("[lifecycle] DB 사용자 수: {}명", userRepository.count());
