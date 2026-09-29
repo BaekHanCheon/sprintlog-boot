@@ -1,8 +1,23 @@
 package com.sprintlog.sprintlogboot.domain;
 
+import jakarta.persistence.*;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+
+@Entity
+@Table(name = "weekly_goals")
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class WeeklyGoal {
 
-    private final int targetMinutes; // 이번 주 목표 학습 시간(분)
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", unique = true)
+    private User user;
+
+    private int targetMinutes; // 이번 주 목표 학습 시간(분)
 
     public WeeklyGoal(int targetMinutes) {
         if (targetMinutes <= 0) {

@@ -3,6 +3,7 @@ package com.sprintlog.sprintlogboot.dto.response;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.sprintlog.sprintlogboot.domain.*;
 
+import java.time.LocalDate;
 import java.util.Set;
 
 @JsonInclude(JsonInclude.Include.NON_NULL) // 값이 비어있는 필드는 JSON에서 아예 빼버려라.
@@ -21,7 +22,9 @@ public record ActivityResponse(
 
         // 연관관계 세팅 후 활동 객체 조회 시 활동을 추가한 user의 정보도 함께 응답
         Long ownerId,
-        String onwerNickname
+        String onwerNickname,
+
+        LocalDate studiedOn
 
 ) {
 
@@ -46,6 +49,7 @@ public record ActivityResponse(
                 activity.getCompletionRate(),
                 activity.getBookTitle(),
                 ownerId,
-                ownerNickname);
+                ownerNickname,
+                activity.getStudiedOn());
     }
 }

@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.ToString;
 
 import java.io.Serializable;
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -42,6 +43,8 @@ public class LearningActivity extends BaseEntity {
 
     @Column(length = 100)
     private String attachmentFileName; // 첨부 파일의 파일명(UUID), 필수가 아니기 때문에 null을 허용
+
+    private LocalDate studiedOn;
 
     // 컬렉션 자료형을 별도의 테이블로 매핑. 테이블 이름은 activity_tags, 활동 테이블과 조인할 수 있는 외래 키 이름은 activity_id
     // ElementCollection: 활동 객체를 조회할 때 tag의 조회 방식 결정
@@ -80,6 +83,11 @@ public class LearningActivity extends BaseEntity {
         this.completionRate = normalizeCompletionRate(completionRate);
         this.bookTitle = bookTitle;
     }
+
+    public void assignStudiedOn(LocalDate studiedOn) {
+        this.studiedOn = (studiedOn != null) ? studiedOn : LocalDate.now();
+    }
+
 
     // 활동의 주인을 지정하는 setter 메서드 (대부분 setter는 이름이 set + 필드명으로 지정되지만, 원한다면 자유롭게 세팅 가능)
     public void assignOwner(User owner) {

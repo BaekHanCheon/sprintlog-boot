@@ -9,6 +9,8 @@ import com.sprintlog.sprintlogboot.repository.ActivityRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.util.*;
 
 @Service // 빈 등록 어노테이션. @Component랑 기능은 똑같고, 계층을 좀 더 명시적으로 표기
@@ -135,6 +137,30 @@ public class ActivityDashboard {
         }
         return goal.achievementRate(studied);
     }
+
+
+    // 사용자별 집계
+    // 한 사용자가 '그 주'에 활동한 시간(분)을 더한다.
+    public int weeklyStudiedMinutes(Long ownerId, LocalDate anyDayOfWeek) {
+        LocalDate monday = anyDayOfWeek.with(DayOfWeek.MONDAY);
+        LocalDate sunday = monday.plusDays(6);
+
+        int total = 0;
+        for (LearningActivity activity : repository.findByOwnerId(ownerId)) {
+            LocalDate studiedOn = activity.getStudiedOn();
+            if (studiedOn == null) {
+                continue;
+            }
+            if (!studiedOn.isBefore(monday) && !studiedOn.isAfter(sunday)) {
+                total += activity.getMinutes();
+            }
+        }
+        return total;
+    }
+
+
+
+
 
 }
 
